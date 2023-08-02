@@ -156,7 +156,6 @@ class ExamineDatasetMgr:
 
 
 def examine(device_mgr, dataset_mgr, file):
-    previous_keys = set(sys.modules.keys())
     try:
         module = tools.file_import(file)
         for class_name, exp_class in inspect.getmembers(module, is_public_experiment):
@@ -177,9 +176,7 @@ def examine(device_mgr, dataset_mgr, file):
             )
             register_experiment(class_name, name, arginfo, scheduler_defaults)
     finally:
-        new_keys = set(sys.modules.keys())
-        for key in new_keys - previous_keys:
-            del sys.modules[key]
+        pass
 
 
 def setup_diagnostics(experiment_file, repository_path):
