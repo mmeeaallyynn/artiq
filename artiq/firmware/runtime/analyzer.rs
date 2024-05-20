@@ -163,7 +163,5 @@ pub fn thread(io: Io, aux_mutex: &Mutex, ddma_mutex: &Mutex, subkernel_mutex: &M
             Ok(())   => (),
             Err(err) => error!("analyzer aborted: {}", err)
         }
-
-        stream.close().expect("analyzer: close socket")
     }
 }

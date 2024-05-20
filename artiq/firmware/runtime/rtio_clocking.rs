@@ -73,7 +73,6 @@ pub mod crg {
     }
 
     pub fn init() -> bool {
-        info!("Using internal RTIO clock");
         unsafe {
             csr::rtio_crg::pll_reset_write(0);
         }

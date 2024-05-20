@@ -52,9 +52,15 @@ class _ArgumentEditor(EntryTreeWidget):
             QtWidgets.QStyle.SP_DialogOpenButton))
         load_hdf5.clicked.connect(dock._load_hdf5_clicked)
 
+        save_hdf5 = QtWidgets.QPushButton("Save HDF5")
+        save_hdf5.setIcon(QtWidgets.QApplication.style().standardIcon(
+            QtWidgets.QStyle.SP_DialogOpenButton))
+        save_hdf5.clicked.connect(dock._save_hdf5_clicked)
+
         buttons = LayoutWidget()
         buttons.addWidget(recompute_arguments, 1, 1)
         buttons.addWidget(load_hdf5, 1, 2)
+        buttons.addWidget(save_hdf5, 1, 0)
         buttons.layout.setColumnStretch(0, 1)
         buttons.layout.setColumnStretch(1, 0)
         buttons.layout.setColumnStretch(2, 0)
@@ -324,6 +330,23 @@ class _ExperimentDock(QtWidgets.QMdiSubWindow):
         self.priority.setValue(scheduling["priority"])
         self.pipeline_name.setText(scheduling["pipeline_name"])
         self.flush.setChecked(scheduling["flush"])
+
+    def _save_hdf5_clicked(self):
+        asyncio.ensure_future(self._save_hdf5_task())
+
+    async def _save_hdf5_task(self):
+        expid = self.manager.generate_expid(self.expurl)
+
+        try:
+            filename = await get_save_file_name(
+                self.manager.main_window, "Save HDF5",
+                self.hdf5_load_directory,
+                "HDF5 files (*.h5 *.hdf5);;All files (*.*)")
+        except asyncio.CancelledError:
+            return
+
+        with h5py.File(filename, "w") as f:
+            f["expid"] = pyon.encode(expid)
 
     def _load_hdf5_clicked(self):
         asyncio.ensure_future(self._load_hdf5_task())
@@ -616,9 +639,8 @@ class ExperimentManager:
         else:
             logger.info("Submitted '%s', RID is %d", expurl, rid)
 
-    def submit(self, expurl):
+    def generate_expid(self, expurl):
         file, class_name, _ = self.resolve_expurl(expurl)
-        scheduling = self.get_submission_scheduling(expurl)
         options = self.get_submission_options(expurl)
         arguments = self.get_submission_arguments(expurl)
 
@@ -642,6 +664,13 @@ class ExperimentManager:
         }
         if "repo_rev" in options:
             expid["repo_rev"] = options["repo_rev"]
+
+        return expid
+
+    def submit(self, expurl):
+        expid = self.generate_expid(expurl)
+        scheduling = self.get_submission_scheduling(expurl)
+
         asyncio.ensure_future(self._submit_task(
             expurl,
             scheduling["pipeline_name"],

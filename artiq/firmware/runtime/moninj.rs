@@ -229,7 +229,6 @@ pub fn thread(io: Io, aux_mutex: &Mutex, ddma_mutex: &Mutex, subkernel_mutex: &M
                 Ok(()) => {},
                 Err(err) => error!("moninj aborted: {}", err)
             }
-            stream.close().expect("moninj: close socket");
         });
     }
 }

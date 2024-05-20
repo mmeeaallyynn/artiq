@@ -31,12 +31,11 @@ extern crate tar_no_std;
 use alloc::collections::BTreeMap;
 use core::cell::RefCell;
 use core::convert::TryFrom;
-use smoltcp::wire::HardwareAddress;
+use smoltcp::wire::IpCidr;
 
 use board_misoc::{csr, ident, clock, spiflash, config, net_settings, pmp, boot};
 #[cfg(has_ethmac)]
 use board_misoc::ethmac;
-use board_misoc::net_settings::{Ipv4AddrConfig};
 #[cfg(has_drtio)]
 use board_artiq::drtioaux;
 use board_artiq::drtio_routing;
@@ -67,8 +66,6 @@ mod session;
 mod moninj;
 #[cfg(has_rtio_analyzer)]
 mod analyzer;
-mod dhcp;
-mod ip_addr_storage;
 
 #[cfg(has_grabber)]
 fn grabber_thread(io: sched::Io) {
@@ -137,29 +134,53 @@ fn startup() {
     net_device.reset_phy_if_any();
 
     let net_device = {
-        use smoltcp::phy::Tracer;
+        use smoltcp::time::Instant;
+        use smoltcp::wire::PrettyPrinter;
+        use smoltcp::wire::EthernetFrame;
 
-        // We can't create the function pointer as a separate variable here because the type of
-        // the packet argument Packet isn't accessible and rust's type inference isn't sufficient
-        // to propagate in to a local var.
-        match config::read_str("net_trace", |r| r.map(|s| s == "1")) {
-            Ok(true) => Tracer::new(net_device, |timestamp, packet| {
-                print!("\x1b[37m[{:6}.{:03}s]\n{}\x1b[0m\n",
-                       timestamp.secs(), timestamp.millis(), packet)
-            }),
-            _ => Tracer::new(net_device, |_, _| {}),
+        fn net_trace_writer(timestamp: Instant, printer: PrettyPrinter<EthernetFrame<&[u8]>>) {
+            print!("\x1b[37m[{:6}.{:03}s]\n{}\x1b[0m\n",
+                   timestamp.secs(), timestamp.millis(), printer)
         }
+
+        fn net_trace_silent(_timestamp: Instant, _printer: PrettyPrinter<EthernetFrame<&[u8]>>) {}
+
+        let net_trace_fn: fn(Instant, PrettyPrinter<EthernetFrame<&[u8]>>);
+        match config::read_str("net_trace", |r| r.map(|s| s == "1")) {
+            Ok(true) => net_trace_fn = net_trace_writer,
+            _ => net_trace_fn = net_trace_silent
+        }
+        smoltcp::phy::EthernetTracer::new(net_device, net_trace_fn)
     };
 
     let neighbor_cache =
         smoltcp::iface::NeighborCache::new(alloc::collections::btree_map::BTreeMap::new());
     let net_addresses = net_settings::get_adresses();
     info!("network addresses: {}", net_addresses);
-    let use_dhcp = if matches!(net_addresses.ipv4_addr, Ipv4AddrConfig::UseDhcp) {
-        info!("Will try to acquire an IPv4 address with DHCP");
-        true
-    } else {
-        false
+    let mut interface = match net_addresses.ipv6_addr {
+        Some(addr) => {
+            let ip_addrs = [
+                IpCidr::new(net_addresses.ipv4_addr, 0),
+                IpCidr::new(net_addresses.ipv6_ll_addr, 0),
+                IpCidr::new(addr, 0)
+            ];
+            smoltcp::iface::EthernetInterfaceBuilder::new(net_device)
+                       .ethernet_addr(net_addresses.hardware_addr)
+                       .ip_addrs(ip_addrs)
+                       .neighbor_cache(neighbor_cache)
+                       .finalize()
+        }
+        None => {
+            let ip_addrs = [
+                IpCidr::new(net_addresses.ipv4_addr, 0),
+                IpCidr::new(net_addresses.ipv6_ll_addr, 0)
+            ];
+            smoltcp::iface::EthernetInterfaceBuilder::new(net_device)
+                       .ethernet_addr(net_addresses.hardware_addr)
+                       .ip_addrs(ip_addrs)
+                       .neighbor_cache(neighbor_cache)
+                       .finalize()
+        }
     };
     let mut interface = smoltcp::iface::InterfaceBuilder::new(net_device, vec![])
         .hardware_addr(HardwareAddress::Ethernet(net_addresses.hardware_addr))
@@ -235,7 +256,19 @@ fn startup() {
     let mut net_stats = ethmac::EthernetStatistics::new();
     loop {
         scheduler.run();
-        scheduler.run_network();
+
+        {
+            let sockets = &mut *scheduler.sockets().borrow_mut();
+            loop {
+                let timestamp = smoltcp::time::Instant::from_millis(clock::get_ms() as i64);
+                match interface.poll(sockets, timestamp) {
+                    Ok(true) => (),
+                    Ok(false) => break,
+                    Err(smoltcp::Error::Unrecognized) => (),
+                    Err(err) => debug!("network error: {}", err)
+                }
+            }
+        }
 
         if let Some(_net_stats_diff) = net_stats.update() {
             debug!("ethernet mac:{}", ethmac::EthernetStatistics::new());

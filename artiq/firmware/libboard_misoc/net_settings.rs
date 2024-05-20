@@ -1,6 +1,4 @@
 use core::fmt;
-use core::fmt::{Display, Formatter};
-use core::str::FromStr;
 
 use smoltcp::wire::{EthernetAddress, IpAddress, IpCidr, Ipv4Address, Ipv4Cidr, Ipv6Address, Ipv6Cidr};
 
