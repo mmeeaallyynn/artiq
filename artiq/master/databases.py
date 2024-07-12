@@ -1,10 +1,14 @@
 import asyncio
-
 from artiq.tools import file_import
 
+from magic_os.database.mongo_tools import timeseries_collection, ExperimentData
 from sipyco.sync_struct import Notifier, process_mod, update_from_dict
 from sipyco import pyon
 from sipyco.asyncio_tools import TaskObject
+from eq_logger import eq_logger
+
+
+logger = eq_logger.get_eq_logger(__name__)
 
 
 def device_db_from_file(filename):
@@ -35,14 +39,38 @@ class DeviceDB:
         return desc
 
 
+def dataset_db_from_database():
+    latest_states = timeseries_collection.aggregate([
+        {"$sort": {"timestamp": -1}},
+        {
+            "$group": {
+                "_id": "$metadata.experiment",
+                "timestamp": {"$first": "$timestamp"},
+                "data": {"$first": "$data"}
+            }
+        }
+    ])
+
+    data = dict()
+    for item in latest_states:
+        try:
+            deserialized_data = ExperimentData.deserialize_data(item["data"])
+            if "value" in deserialized_data:
+                data[item["_id"]] = deserialized_data["value"]
+        except Exception:
+            logger.warning(f"Couldn't load dataset {item['_id']}")
+
+    return data
+
+
 class DatasetDB(TaskObject):
     def __init__(self, persist_file, autosave_period=30):
         self.persist_file = persist_file
         self.autosave_period = autosave_period
 
         try:
-            file_data = pyon.load_file(self.persist_file)
-        except FileNotFoundError:
+            file_data = dataset_db_from_database()
+        except Exception:
             file_data = dict()
         self.data = Notifier({k: (True, v) for k, v in file_data.items()})
 
