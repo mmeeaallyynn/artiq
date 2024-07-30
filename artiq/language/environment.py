@@ -232,11 +232,13 @@ class HasEnvironment:
             self.__dataset_mgr = managers_or_parent[1]
             self.__argument_mgr = managers_or_parent[2]
             self.__scheduler_defaults = managers_or_parent[3]
+            self.__parent = None
         else:
             self.__device_mgr = managers_or_parent.__device_mgr
             self.__dataset_mgr = managers_or_parent.__dataset_mgr
             self.__argument_mgr = managers_or_parent.__argument_mgr
             self.__scheduler_defaults = {}
+            self.__parent = managers_or_parent
             managers_or_parent.register_child(self)
 
         self.__in_build = True
@@ -416,6 +418,21 @@ class HasEnvironment:
             self.__scheduler_defaults["pipeline_name"] = pipeline_name
         if flush is not None:
             self.__scheduler_defaults["flush"] = flush
+
+    def parent_experiment(self):
+        """Try to find the parent experiment.
+
+        Walk up the tree of parents to find the ``EnvExperiment`` this
+        environment was created in.
+        """
+        if self.__parent is None:
+            return None
+
+        if isinstance(self.__parent, EnvExperiment):
+            return self.__parent
+
+        if isinstance(self.__parent, HasEnvironment):
+            return self.__parent.parent_experiment()
 
 
 class Experiment:
