@@ -6,11 +6,10 @@ from sipyco import pyon
 from artiq.language import units
 from artiq.language.core import rpc
 
-
 __all__ = ["NoDefault", "DefaultMissing",
            "PYONValue", "BooleanValue", "EnumerationValue",
            "NumberValue", "StringValue",
-           "HasEnvironment", "Experiment", "EnvExperiment"]
+           "HasEnvironment", "Experiment", "EnvExperiment", "DatasetToggleValue"]
 
 
 class NoDefault:
@@ -199,6 +198,35 @@ class NumberValue(_SimpleArgProcessor):
 class StringValue(_SimpleArgProcessor):
     """A string argument."""
     pass
+
+
+class DatasetToggleValue(_SimpleArgProcessor):
+    """ """
+
+    def __init__(self, argument: _SimpleArgProcessor = None,
+                 from_data_set: BooleanValue = None,
+                 data_set_value: any = None,
+                 default=NoDefault):
+
+        self.argument = argument
+        self.from_data_set = from_data_set
+        self.data_set_value = data_set_value
+        super().__init__(default)
+
+    def process(self, x):
+
+        from_data_set = self.from_data_set.process(x["from_data_set"])
+
+        if from_data_set:
+            return self.data_set_value
+        else:
+            return self.argument.process(x["argument"])
+
+    def describe(self):
+        d = {"ty": self.__class__.__name__}
+        d['argument'] = self.argument.describe()
+        d['from_data_set'] = self.from_data_set.describe()
+        return d
 
 
 class TraceArgumentManager:
