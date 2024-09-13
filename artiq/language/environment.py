@@ -220,7 +220,7 @@ class DatasetToggleValue(_SimpleArgProcessor):
         if from_data_set:
             return self.data_set_value
         else:
-            return self.argument.process(x["argument"]),
+            return self.argument.process(x["argument"])
 
     def describe(self):
         d = {"ty": self.__class__.__name__}
