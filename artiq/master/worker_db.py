@@ -26,6 +26,12 @@ def _create_device(desc, device_mgr, argument_overrides):
         device_class = getattr(module, desc["class"])
         arguments = desc.get("arguments", {}) | argument_overrides
         return device_class(device_mgr, **arguments)
+    elif ty == "local-controller":
+        module = importlib.import_module(desc["module"])
+        device_class = getattr(module, desc["class"])
+        # The below consider that the driver has a __enter__ method
+        # which means that the driver can be use with the contextmanager and the keyword `with`
+        return device_class(**desc.get("arguments", {})).__enter__()
     elif ty == "controller":
         if desc.get("best_effort", False):
             cls = BestEffortClient
