@@ -203,6 +203,11 @@ class StringValue(_SimpleArgProcessor):
 class DatasetToggleValue(_SimpleArgProcessor):
     """ Argument that allows to toggle between a user specified value and
     a given alternative data
+
+    :param argument: Argument that the user can set in the web view
+    :param from_data_set: BooleanValue that the user can set in the frontend
+        to toggle between argument and data_set_value
+    :param data_set_value: The value of the argument that is stored in the database
     
     """
 
