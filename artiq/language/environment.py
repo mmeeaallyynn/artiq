@@ -201,7 +201,10 @@ class StringValue(_SimpleArgProcessor):
 
 
 class DatasetToggleValue(_SimpleArgProcessor):
-    """ """
+    """ Argument that allows to toggle between a user specified value and
+    a given alternative data
+    
+    """
 
     def __init__(self, argument: _SimpleArgProcessor = None,
                  from_data_set: BooleanValue = None,
