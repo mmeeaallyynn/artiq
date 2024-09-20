@@ -208,7 +208,7 @@ class DatasetToggleValue(_SimpleArgProcessor):
     :param from_data_set: BooleanValue that the user can set in the frontend
         to toggle between argument and data_set_value
     :param data_set_value: The value of the argument that is stored in the database
-    
+
     """
 
     def __init__(self, argument: _SimpleArgProcessor = None,
