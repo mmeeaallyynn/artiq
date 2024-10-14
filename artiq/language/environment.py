@@ -6,11 +6,10 @@ from sipyco import pyon
 from artiq.language import units
 from artiq.language.core import rpc
 
-
 __all__ = ["NoDefault", "DefaultMissing",
            "PYONValue", "BooleanValue", "EnumerationValue",
            "NumberValue", "StringValue",
-           "HasEnvironment", "Experiment", "EnvExperiment"]
+           "HasEnvironment", "Experiment", "EnvExperiment", "DatasetToggleValue"]
 
 
 class NoDefault:
@@ -199,6 +198,43 @@ class NumberValue(_SimpleArgProcessor):
 class StringValue(_SimpleArgProcessor):
     """A string argument."""
     pass
+
+
+class DatasetToggleValue(_SimpleArgProcessor):
+    """ Argument that allows to toggle between a user specified value and
+    a given alternative data
+
+    :param argument: Argument that the user can set in the web view
+    :param from_data_set: BooleanValue that the user can set in the frontend
+        to toggle between argument and data_set_value
+    :param data_set_value: The value of the argument that is stored in the database
+
+    """
+
+    def __init__(self, argument: _SimpleArgProcessor = None,
+                 from_data_set: BooleanValue = None,
+                 data_set_value: any = None,
+                 default=NoDefault):
+
+        self.argument = argument
+        self.from_data_set = from_data_set
+        self.data_set_value = data_set_value
+        super().__init__(default)
+
+    def process(self, x):
+
+        from_data_set = self.from_data_set.process(x["from_data_set"])
+
+        if from_data_set:
+            return self.data_set_value
+        else:
+            return self.argument.process(x["argument"])
+
+    def describe(self):
+        d = {"ty": self.__class__.__name__}
+        d['argument'] = self.argument.describe()
+        d['from_data_set'] = self.from_data_set.describe()
+        return d
 
 
 class TraceArgumentManager:
