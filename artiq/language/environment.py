@@ -8,6 +8,7 @@ from artiq.language.core import rpc
 
 __all__ = ["NoDefault", "DefaultMissing",
            "PYONValue", "BooleanValue", "EnumerationValue",
+           "ArgumentGroup", "ArgumentGroupSelection",
            "NumberValue", "StringValue",
            "HasEnvironment", "Experiment", "EnvExperiment", "DatasetToggleValue"]
 
@@ -92,6 +93,60 @@ class EnumerationValue(_SimpleArgProcessor):
     def describe(self):
         d = _SimpleArgProcessor.describe(self)
         d["choices"] = self.choices
+        return d
+
+
+class ArgumentGroup(_SimpleArgProcessor):
+    """
+    Container to organize arguments in groups. Use with
+    ArgumentGroupSelection
+
+    :param group_values: dict[str, _SimpleArgProcessor] where the string
+    is the name for the argument and will be displayed in the frontend
+    """
+    def __init__(self, group_values: dict[str, _SimpleArgProcessor], default=NoDefault):
+        self.group_values = group_values
+
+    def process(self, x):
+        res = {}
+        for key, value in x.items():
+            res[key] = self.group_values[key].process(value)
+        return res
+
+    def describe(self):
+        d = {"ty": self.__class__.__name__}
+        d["values"] = {}
+        for key, value in self.group_values.items():
+
+            d["values"][key] = value.describe()
+        return d
+
+
+class ArgumentGroupSelection(_SimpleArgProcessor):
+    """
+    Allows to switch between argument groups.
+
+    :param values: dict[str, ArgumentGroup] where the string is the name
+    for the argument group and will be displayed in the frontend
+
+
+    :return dict: Dictionary with keys "choice" and "values" where choice is 
+    the name of the chosen argument group and the values are the values of that group.
+    """
+    def __init__(self, values: dict[str, ArgumentGroup],  default=NoDefault):
+        self.choices = EnumerationValue(list(values.keys()))
+        self.values = values
+
+    def process(self, x):
+        choice = self.choices.process(x["choice"])
+        values = self.values[choice].process(x["values"])
+        return {"choice": choice, "values": values}
+
+    def describe(self):
+        d = {"ty": self.__class__.__name__}
+        d["choices"] = self.choices.describe()
+        d["values"] = {key: self.values[key].describe() for key in self.values}
+
         return d
 
 
