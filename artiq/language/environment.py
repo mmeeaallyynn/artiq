@@ -107,8 +107,16 @@ class ArgumentGroup(_SimpleArgProcessor):
     def __init__(self, group_values: dict[str, _SimpleArgProcessor], default=NoDefault):
         self.group_values = group_values
 
+        # A default value is not reasonable for this argument type, so we pass NoDefault
+        super().__init__(NoDefault)
+
     def process(self, x):
         res = {}
+
+        # return an empty dictionary when trying to access the default value
+        if x is NoDefault:
+            return res
+
         for key, value in x.items():
             res[key] = self.group_values[key].process(value)
         return res
@@ -137,7 +145,14 @@ class ArgumentGroupSelection(_SimpleArgProcessor):
         self.choices = EnumerationValue(list(values.keys()))
         self.values = values
 
+        # A default value is not reasonable for this argument type, so we pass NoDefault
+        super().__init__(NoDefault)
+
     def process(self, x):
+        # return an empty dictionary when trying to access the default value
+        if x is NoDefault:
+            return {}
+
         choice = self.choices.process(x["choice"])
         values = self.values[choice].process(x["values"])
         return {"choice": choice, "values": values}
