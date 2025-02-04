@@ -1,3 +1,4 @@
+import typing as t
 from collections import OrderedDict
 from inspect import isclass
 
@@ -281,9 +282,9 @@ class DatasetToggleValue(_SimpleArgProcessor):
 
     """
 
-    def __init__(self, argument: _SimpleArgProcessor = None,
-                 from_data_set: BooleanValue = None,
-                 data_set_value: any = None,
+    def __init__(self, argument: _SimpleArgProcessor | None = None,
+                 from_data_set: BooleanValue | None = None,
+                 data_set_value: t.Any = None,
                  default=NoDefault):
 
         self.argument = argument
