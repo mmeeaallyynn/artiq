@@ -198,7 +198,7 @@ class _AppletDock(QDockWidgetCloseDetect):
             if hasattr(self.ipc, "process"):
                 self.ipc.write_pyon({"action": "terminate"})
                 try:
-                    await asyncio.wait_for(self.ipc.process.wait(), 2.0)
+                    await asyncio.wait_for(asyncio.Task(self.ipc.process.wait()), 2.0)
                 except:
                     logger.warning("Applet %s failed to exit, killing",
                                    self.applet_name)

@@ -221,8 +221,8 @@ def main():
                     loop.run_until_complete(server.start(bind_address, args.port_control))
                     try:
                         _, pending = loop.run_until_complete(asyncio.wait(
-                            [signal_handler.wait_terminate(),
-                             server.wait_terminate(),
+                            [asyncio.Task(signal_handler.wait_terminate()),
+                             asyncio.Task(server.wait_terminate()),
                              comm_moninj.wait_terminate()],
                             return_when=asyncio.FIRST_COMPLETED))
                         for task in pending:

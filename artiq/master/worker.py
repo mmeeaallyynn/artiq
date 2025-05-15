@@ -122,7 +122,7 @@ class Worker:
                 return
             try:
                 await self._send({"action": "terminate"}, cancellable=False)
-                await asyncio.wait_for(self.ipc.process.wait(), term_timeout)
+                await asyncio.wait_for(asyncio.Task(self.ipc.process.wait()), term_timeout)
                 logger.debug("worker exited on request (RID %s)", self.rid)
                 return
             except:
@@ -135,7 +135,7 @@ class Worker:
                 except ProcessLookupError:
                     pass
                 try:
-                    await asyncio.wait_for(self.ipc.process.wait(),
+                    await asyncio.wait_for(asyncio.Task(self.ipc.process.wait()),
                                            term_timeout)
                     logger.debug("worker terminated (RID %s)", self.rid)
                     return
