@@ -156,6 +156,7 @@
       migen = pkgs.python3Packages.buildPythonPackage rec {
         name = "migen";
         src = src-migen;
+        format = "pyproject";
         propagatedBuildInputs = [ pkgs.python3Packages.colorama ];
       };
 
@@ -165,8 +166,8 @@
         src = pkgs.fetchFromGitHub {
           owner = "m-labs";
           repo = "asyncserial";
-          rev = "d95bc1d6c791b0e9785935d2f62f628eb5cdf98d";
-          sha256 = "0yzkka9jk3612v8gx748x6ziwykq5lr7zmr9wzkcls0v2yilqx9k";
+          rev = "446559fec892a556876b17d17f182ae9647d5952";
+          sha256 = "sha256-WExmgh55sTH2w7wV3i96J1F1FN7L5rX3L/Ayvt2Kw/g=";
         };
         propagatedBuildInputs = [ pkgs.python3Packages.pyserial ];
       };
@@ -202,20 +203,6 @@
         propagatedBuildInputs = with pkgs.python3Packages; [ pyserial prettytable msgpack migen ];
       };
 
-      cargo-xbuild = rustPlatform.buildRustPackage rec {
-        pname = "cargo-xbuild";
-        version = "0.6.5";
-
-        src = pkgs.fetchFromGitHub {
-          owner = "rust-osdev";
-          repo = pname;
-          rev = "v${version}";
-          sha256 = "18djvygq9v8rmfchvi2hfj0i6fhn36m716vqndqnj56fiqviwxvf";
-        };
-
-        cargoSha256 = "13sj9j9kl6js75h9xq0yidxy63vixxm9q3f8jil6ymarml5wkhx8";
-      };
-
       vivadoEnv = pkgs.buildFHSUserEnv {
         name = "vivado-env";
         targetPkgs = vivadoDeps;
@@ -247,7 +234,6 @@
             pkgs.lld_11
             vivado
             rustPlatform.cargoSetupHook
-            cargo-xbuild
           ];
           buildPhase = 
             ''
@@ -403,7 +389,6 @@
           (pkgs.python3.withPackages(ps: with packages.x86_64-linux; [ migen misoc jesd204b artiq ps.paramiko ps.jsonschema microscope ]))
           rustPlatform.rust.rustc
           rustPlatform.rust.cargo
-          cargo-xbuild
           pkgs.llvmPackages_11.clang-unwrapped
           pkgs.llvm_11
           pkgs.lld_11

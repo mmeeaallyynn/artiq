@@ -198,7 +198,7 @@ class _AppletDock(QDockWidgetCloseDetect):
             if hasattr(self.ipc, "process"):
                 self.ipc.write_pyon({"action": "terminate"})
                 try:
-                    await asyncio.wait_for(self.ipc.process.wait(), 2.0)
+                    await asyncio.wait_for(asyncio.Task(self.ipc.process.wait()), 2.0)
                 except:
                     logger.warning("Applet %s failed to exit, killing",
                                    self.applet_name)
@@ -313,7 +313,7 @@ class _CompleterDelegate(QtWidgets.QStyledItemDelegate):
             # case, but causes unnecessary flickering and trashing of the user
             # selection when datasets are modified due to Qt's naive handler.
             # Doing this is of course convoluted due to Qt's arrogance
-            # about private fields and not letting users knows what
+            # about private fields and not letting users know what
             # slots are connected to signals, but thanks to the complicated
             # model system there is a short dirty hack in this particular case.
             nodatachanged_model = QtCore.QIdentityProxyModel()

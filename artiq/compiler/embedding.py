@@ -45,21 +45,34 @@ class EmbeddingMap:
         self.object_forward_map = {}
         self.object_reverse_map = {}
         self.module_map = {}
+
+        # type_map connects the host Python `type` to the pair of associated
+        # `(TInstance, TConstructor)`s. The `used_…_names` sets cache the
+        # respective `.name`s for O(1) collision avoidance.
         self.type_map = {}
+        self.used_instance_type_names = set()
+        self.used_constructor_type_names = set()
+
         self.function_map = {}
         self.str_forward_map = {}
         self.str_reverse_map = {}
 
-        self.preallocate_runtime_exception_names(["RuntimeError",
-                                                  "RTIOUnderflow",
-                                                  "RTIOOverflow",
-                                                  "RTIODestinationUnreachable",
-                                                  "DMAError",
-                                                  "I2CError",
-                                                  "CacheError",
-                                                  "SPIError",
-                                                  "0:ZeroDivisionError",
-                                                  "0:IndexError"])
+        # Keep this list of exceptions in sync with `EXCEPTION_ID_LOOKUP` in `artiq::firmware::ksupport::eh_artiq`
+        # The exceptions declared here must be defined in `artiq.coredevice.exceptions`
+        # Verify synchronization by running the test cases in `artiq.test.coredevice.test_exceptions`
+        self.preallocate_runtime_exception_names([
+            "0:RuntimeError",
+            "RTIOUnderflow",
+            "RTIOOverflow",
+            "RTIODestinationUnreachable",
+            "DMAError",
+            "I2CError",
+            "CacheError",
+            "SPIError",
+            "0:ZeroDivisionError",
+            "0:IndexError",
+            "UnwrapNoneError",
+        ])
 
     def preallocate_runtime_exception_names(self, names):
         for i, name in enumerate(names):
@@ -91,16 +104,6 @@ class EmbeddingMap:
 
     # Types
     def store_type(self, host_type, instance_type, constructor_type):
-        self._rename_type(instance_type)
-        self.type_map[host_type] = (instance_type, constructor_type)
-
-    def retrieve_type(self, host_type):
-        return self.type_map[host_type]
-
-    def has_type(self, host_type):
-        return host_type in self.type_map
-
-    def _rename_type(self, new_instance_type):
         # Generally, user-defined types that have exact same name (which is to say, classes
         # defined inside functions) do not pose a problem to the compiler. The two places which
         # cannot handle this are:
@@ -109,12 +112,29 @@ class EmbeddingMap:
         # Since handling #2 requires renaming on ARTIQ side anyway, it's more straightforward
         # to do it once when embedding (since non-embedded code cannot define classes in
         # functions). Also, easier to debug.
-        n = 0
-        for host_type in self.type_map:
-            instance_type, constructor_type = self.type_map[host_type]
-            if instance_type.name == new_instance_type.name:
-                n += 1
-                new_instance_type.name = "{}.{}".format(new_instance_type.name, n)
+        suffix = 0
+        new_instance_name = instance_type.name
+        new_constructor_name = constructor_type.name
+        while True:
+            if (new_instance_name not in self.used_instance_type_names
+                    and new_constructor_name not in self.used_constructor_type_names):
+                break
+            suffix += 1
+            new_instance_name = f"{instance_type.name}.{suffix}"
+            new_constructor_name = f"{constructor_type.name}.{suffix}"
+
+        self.used_instance_type_names.add(new_instance_name)
+        instance_type.name = new_instance_name
+        self.used_constructor_type_names.add(new_constructor_name)
+        constructor_type.name = new_constructor_name
+
+        self.type_map[host_type] = (instance_type, constructor_type)
+
+    def retrieve_type(self, host_type):
+        return self.type_map[host_type]
+
+    def has_type(self, host_type):
+        return host_type in self.type_map
 
     def attribute_count(self):
         count = 0
@@ -193,7 +213,9 @@ class ASTSynthesizer:
         if len(value) > 0:
             v = value[0]
             is_T = True
-            if isinstance(v, int):
+            if isinstance(v, bool):
+                is_T = False
+            elif isinstance(v, int):
                 T = int
             elif isinstance(v, float):
                 T = float
@@ -532,7 +554,7 @@ class StitchingASTTypedRewriter(ASTTypedRewriter):
         node = asttyped.QuotedFunctionDefT(
             typing_env=extractor.typing_env, globals_in_scope=extractor.global_,
             signature_type=types.TVar(), return_type=types.TVar(),
-            name=node.name, args=node.args, returns=node.returns,
+            name=node.name, args=node.args, returns=None,
             body=node.body, decorator_list=node.decorator_list,
             keyword_loc=node.keyword_loc, name_loc=node.name_loc,
             arrow_loc=node.arrow_loc, colon_loc=node.colon_loc, at_locs=node.at_locs,
@@ -644,9 +666,9 @@ class StitchingInferencer(Inferencer):
                 if elt.__class__ == float:
                     state |= IS_FLOAT
                 elif elt.__class__ == int:
-                    if -2**31 < elt < 2**31-1:
+                    if -2**31 <= elt <= 2**31-1:
                         state |= IS_INT32
-                    elif -2**63 < elt < 2**63-1:
+                    elif -2**63 <= elt <= 2**63-1:
                         state |= IS_INT64
                     else:
                         state = -1
